@@ -16,4 +16,5 @@
 /vendor/
 /web/bundles/
 !var/data/data.sqlite
+!var/data/teams.txt
 /.idea
