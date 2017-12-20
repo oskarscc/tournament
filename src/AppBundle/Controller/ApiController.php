@@ -2,7 +2,9 @@
 
 namespace AppBundle\Controller;
 
+use AppBundle\Entity\Result;
 use AppBundle\Entity\Team;
+use AppBundle\Helpers\DIvisionLevels;
 use AppBundle\Repository\TeamRepository;
 use Symfony\Bundle\FrameworkBundle\Controller\Controller;
 use Sensio\Bundle\FrameworkExtraBundle\Configuration\Route;
@@ -70,6 +72,61 @@ class ApiController extends Controller
         $jsonContent = $serializer->serialize($teamData['teams'], 'json');
 
         return new Response($jsonContent);
+    }
+
+    /**
+     * @Route("/division-games/{divisionName}", name="division_games")
+     */
+    public function playDivisionAction(Request $request, $divisionName)
+    {
+        $em = $this->get('doctrine.orm.default_entity_manager');
+
+        $teamRepo = $em->getRepository(Team::class);
+        $resultRepo = $em->getRepository(Result::class);
+
+        $divisionTeams = $teamRepo->findBy(['division' => $divisionName]);
+        $hasPlayed = $resultRepo->findBy(['divisionName' => $divisionName]);
+
+        if(!empty($hasPlayed)){
+            return new Response("This division has already played");
+        }
+
+        if(empty($divisionTeams)){
+            return new Response("No teams for this division");
+        }
+
+//        dump($divisionTeams);die;
+
+        foreach ($divisionTeams as $home){
+            foreach ($divisionTeams as $guest){
+
+                /**@var Team $home */
+                /**@var Team $guest */
+
+                if($home->getId() != $guest->getId()){
+
+                    $matchWon = (bool)random_int(0, 1);
+
+                    $thisResult = new Result();
+                    $thisResult->setHome($home)
+                        ->setGuests($guest)
+                        ->setWin($matchWon)
+                        ->setLevel($matchWon ? DIvisionLevels::DIVISION : 0)
+                        ->setPoints($matchWon ? DIvisionLevels::DIVISION_POINTS : 0)
+                        ->setDivisionName($divisionName)
+                    ;
+
+                    $em->persist($thisResult);
+                }
+            }
+        }
+
+//        die;
+
+        $em->flush();
+
+        return new Response(sprintf('teams of %s division finished games!', $divisionName));
+
     }
 
     private function getTeamData(TeamRepository $teamRepo, $divisionName)

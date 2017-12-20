@@ -22,16 +22,14 @@ class Result
     private $id;
 
     /**
-     * @var string
-     *
-     * @ORM\Column(name="home", type="string", length=255)
+     * @ORM\ManyToOne(targetEntity="AppBundle\Entity\Team")
+     * @ORM\JoinColumn(name="home_team", referencedColumnName="id")
      */
     private $home;
 
     /**
-     * @var string
-     *
-     * @ORM\Column(name="guests", type="string", length=255)
+     * @ORM\ManyToOne(targetEntity="AppBundle\Entity\Team")
+     * @ORM\JoinColumn(name="guest_team", referencedColumnName="id")
      */
     private $guests;
 
@@ -48,6 +46,13 @@ class Result
      * @ORM\Column(name="level", type="string", length=255)
      */
     private $level;
+
+    /**
+     * @var string
+     *
+     * @ORM\Column(name="division_name", type="string", length=255, nullable=true)
+     */
+    private $divisionName;
 
     /**
      * @var int
@@ -68,23 +73,7 @@ class Result
     }
 
     /**
-     * Set home
-     *
-     * @param string $home
-     *
-     * @return Result
-     */
-    public function setHome($home)
-    {
-        $this->home = $home;
-
-        return $this;
-    }
-
-    /**
-     * Get home
-     *
-     * @return string
+     * @return mixed
      */
     public function getHome()
     {
@@ -92,28 +81,33 @@ class Result
     }
 
     /**
-     * Set guests
-     *
-     * @param string $guests
-     *
-     * @return Result
+     * @param Team $home
      */
-    public function setGuests($guests)
+    public function setHome($home): Result
+    {
+        $this->home = $home;
+
+        return $this;
+    }
+
+    /**
+     * @return mixed
+     */
+    public function getGuests()
+    {
+        return $this->guests;
+    }
+
+    /**
+     * @param Team $guests
+     */
+    public function setGuests($guests): Result
     {
         $this->guests = $guests;
 
         return $this;
     }
 
-    /**
-     * Get guests
-     *
-     * @return string
-     */
-    public function getGuests()
-    {
-        return $this->guests;
-    }
 
     /**
      * Set win
@@ -122,7 +116,7 @@ class Result
      *
      * @return Result
      */
-    public function setWin($win)
+    public function setWin($win): Result
     {
         $this->win = $win;
 
@@ -146,7 +140,7 @@ class Result
      *
      * @return Result
      */
-    public function setLevel($level)
+    public function setLevel($level): Result
     {
         $this->level = $level;
 
@@ -170,7 +164,7 @@ class Result
      *
      * @return Result
      */
-    public function setPoints($points)
+    public function setPoints($points): Result
     {
         $this->points = $points;
 
@@ -185,6 +179,24 @@ class Result
     public function getPoints()
     {
         return $this->points;
+    }
+
+    /**
+     * @return string
+     */
+    public function getDivisionName()
+    {
+        return $this->divisionName;
+    }
+
+    /**
+     * @param string $divisionName
+     */
+    public function setDivisionName($divisionName): Result
+    {
+        $this->divisionName = $divisionName;
+
+        return $this;
     }
 }
 
