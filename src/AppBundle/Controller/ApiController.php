@@ -16,7 +16,6 @@ use Symfony\Component\Serializer\Serializer;
 /**
  * @Route("/api")
  */
-
 class ApiController extends Controller
 {
     CONST TEAM_COUNT_PER_DEVISION = 8;
@@ -27,23 +26,20 @@ class ApiController extends Controller
     public function generateDivisionAction(Request $request, $divisionName)
     {
 
-        $dataFilePath = $this->get('kernel')->getRootDir().'/../var/data/teams.txt';
-//        dump((string) $divisionName);die;
-
+        $dataFilePath = $this->get('kernel')->getRootDir() . '/../var/data/teams.txt';
         $em = $this->get('doctrine.orm.default_entity_manager');
 
-        if(!file_exists($dataFilePath)){
+        if (!file_exists($dataFilePath)) {
             return new Response('No file provided for teams');
         }
 
         $teams = file($dataFilePath);
-
         $teamRepo = $em->getRepository(Team::class);
 
         do {
             $teamData = $this->getTeamData($teamRepo, $divisionName);
 
-            if($teamData['teamCount'] >= 8){
+            if ($teamData['teamCount'] >= self::TEAM_COUNT_PER_DEVISION) {
                 break;
             }
 
@@ -52,7 +48,7 @@ class ApiController extends Controller
             $teamName = trim($teams[$pickTeam]);
             $teamIncluded = $teamRepo->findOneBy(['name' => $teamName]);
 
-            if(!$teamIncluded){
+            if (!$teamIncluded) {
 
                 $newTeam = new Team();
                 $newTeam
