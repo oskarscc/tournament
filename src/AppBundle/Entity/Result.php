@@ -61,6 +61,12 @@ class Result
      */
     private $points;
 
+    /**
+     * @var string
+     *
+     * @ORM\Column(name="branch", type="string", length=1, nullable=true)
+     */
+    private $branch;
 
     /**
      * Get id
@@ -195,6 +201,24 @@ class Result
     public function setDivisionName($divisionName): Result
     {
         $this->divisionName = $divisionName;
+
+        return $this;
+    }
+
+    /**
+     * @return string | null
+     */
+    public function getBranch()
+    {
+        return $this->branch;
+    }
+
+    /**
+     * @param string $branch
+     */
+    public function setBranch(string $branch): Result
+    {
+        $this->branch = $branch;
 
         return $this;
     }
