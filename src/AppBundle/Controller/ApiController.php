@@ -95,7 +95,7 @@ class ApiController extends Controller
             return new Response("No teams for this division");
         }
 
-//        dump($divisionTeams);die;
+        // Each team plays with each for current division
 
         foreach ($divisionTeams as $home){
             foreach ($divisionTeams as $guest){
@@ -121,14 +121,44 @@ class ApiController extends Controller
             }
         }
 
-//        die;
-
         $em->flush();
 
         return new Response(sprintf('teams of %s division finished games!', $divisionName));
 
     }
 
+    /**
+     * @Route("/qfinal-games", name="qfinal_games")
+     */
+    public function playQFinalAction(Request $request)
+    {
+        $MAX_RESULT = 4;
+        $em = $this->get('doctrine.orm.default_entity_manager');
+
+        $teamRepo = $em->getRepository(Team::class);
+        $resultRepo = $em->getRepository(Result::class);
+
+        /** @var array $validDivisions */
+        $validDivisions = $teamRepo->getDivisions();
+
+        foreach ($validDivisions as $division){
+
+            $best4Teams = $resultRepo->getBest4TeamsbyDivisionAndLevel($division, DIvisionLevels::DIVISION, $MAX_RESULT);
+
+            dump($best4Teams);
+        }
+
+        die;
+
+        return new Response(sprintf('Q-final games finished!'));
+
+    }
+
+    /**
+     * @param TeamRepository $teamRepo
+     * @param $divisionName
+     * @return array
+     */
     private function getTeamData(TeamRepository $teamRepo, $divisionName)
     {
 

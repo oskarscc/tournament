@@ -10,4 +10,27 @@ namespace AppBundle\Repository;
  */
 class ResultRepository extends \Doctrine\ORM\EntityRepository
 {
+
+    public function getBest4TeamsbyDivisionAndLevel(string $division, string $level, int $maxResult)
+    {
+        $qb = $this->createQueryBuilder('team');
+
+        $query = $qb
+            ->select('homeTeam.id, team.divisionName, SUM(team.points) as totalPoints')
+            ->join('team.home', 'homeTeam')
+            ->where('team.divisionName = :division')
+            ->setParameter('division', $division)
+            ->andWhere('team.level = :level')
+            ->setParameter('level', $level)
+            ->groupBy('team.home')
+            ->orderBy('totalPoints', 'DESC')
+            ->setMaxResults($maxResult)
+            ->getQuery()
+        ;
+
+        $result = $query->getResult();
+
+        return $result;
+    }
+
 }
