@@ -25,10 +25,11 @@ class ApiController extends Controller
     CONST TEAM_COUNT_PER_DEVISION = 8;
 
     /**
-     * @Route("/generate-division/{divisionName}", name="generate_division")
+     * @Route("/generate-division", name="generate_division")
      */
-    public function generateDivisionAction(Request $request, $divisionName)
+    public function generateDivisionAction(Request $request)
     {
+        $divisionName = $request->query->get('divisionName');
 
         $dataFilePath = $this->get('kernel')->getRootDir() . '/../var/data/teams.txt';
         $em = $this->get('doctrine.orm.default_entity_manager');
