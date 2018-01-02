@@ -37,7 +37,7 @@ class Team
 
     /**
      * @ORM\ManyToOne(targetEntity="AppBundle\Entity\Branch")
-     * @ORM\JoinColumn(name="branch", referencedColumnName="id", nullable=true)
+     * @ORM\JoinColumn(name="branch", referencedColumnName="id", nullable=true, onDelete="cascade")
      */
     private $branch;
 

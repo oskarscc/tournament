@@ -7,9 +7,9 @@ use AppBundle\Entity\Result;
 use AppBundle\Entity\Team;
 use AppBundle\Helpers\DivisionLevels;
 use AppBundle\Repository\TeamRepository;
+use Doctrine\ORM\EntityManager;
 use Symfony\Bundle\FrameworkBundle\Controller\Controller;
 use Sensio\Bundle\FrameworkExtraBundle\Configuration\Route;
-use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Serializer\Encoder\JsonEncoder;
@@ -158,8 +158,7 @@ class ApiController extends Controller
             $divisionSplit[$division] = $key == 0 ? $best4Teams: array_reverse($best4Teams);
         }
 
-        //check if qfinals are not found in result table already
-
+        //check if qfinals are found in result table already
         $qFinalEntries = $resultRepo->findBy(['level' => DivisionLevels::QFINAL['level']]);
 
         if(count($qFinalEntries) != 0){
@@ -180,29 +179,175 @@ class ApiController extends Controller
             $home = $teamRepo->findOneBy(['id' => $divisionSplit[$validDivisions[0]][$i]['id']]);
             $guest = $teamRepo->findOneBy(['id' => $divisionSplit[$validDivisions[1]][$i]['id']]);
 
-            $matchWon = (bool)random_int(0, 1);
+            $this->playMatch($em, DivisionLevels::QFINAL, $home, $guest);
 
-            $thisResult = new Result();
-            $thisResult->setHome($home)
-                ->setGuests($guest)
-                ->setWin($matchWon)
-                ->setLevel(DivisionLevels::QFINAL['level'])
-                ->setPoints($matchWon ? DivisionLevels::QFINAL['points'] : 0)
-            ;
+//            $matchWon = (bool)random_int(0, 1);
+//
+//            $thisResult = new Result();
+//            $thisResult->setHome($matchWon ? $home : $guest)
+//                ->setGuests($matchWon ? $guest : $home)
+//                ->setWin(true)
+//                ->setLevel(DivisionLevels::QFINAL['level'])
+//                ->setPoints(DivisionLevels::QFINAL['points'])
+//            ;
 
-            $em->persist($thisResult);
+            $home->setBranch($thisBranch);
+            $guest->setBranch($thisBranch);
 
-            $resultBag[] = $thisResult;
+//            $em->persist($thisResult);
+
+//            $resultBag[] = $thisResult;
         }
 
         $em->flush();
 
         return $this->json([
-            'status' => 'Qfinal games finished',
-            'message' => 'Db cleared',
-            'ŗesult_bag' => $resultBag,
+            'status' => 'success',
+            'message' => 'qfinal games finished',
+//            'ŗesult_bag' => $resultBag,
         ]);
 
+    }
+
+    /**
+     * @Route("/semi-final-games", name="semi_final_games")
+     */
+    public function playSemiFinalAction(Request $request)
+    {
+        $em = $this->get('doctrine.orm.default_entity_manager');
+
+        $resultRepo = $em->getRepository(Result::class);
+        $branchRepo = $em->getRepository(Branch::class);
+
+        $validBranches = $branchRepo->findAll();
+
+        $bestTeamsByBranches = [];
+
+        foreach ($validBranches as $branch) {
+
+            $twoBestByBranch = $resultRepo->twoBestByBranch($branch, DivisionLevels::QFINAL['level']);
+            $bestTeamsByBranches[$branch->getName()] = $twoBestByBranch;
+        }
+
+        //check if semi-finals are found in result table already
+        $semiFinalEntries = $resultRepo->findBy(['level' => DivisionLevels::SEMI_FINAL['level']]);
+
+        if(count($semiFinalEntries) != 0){
+
+            return $this->json([
+                'status' => 'fail',
+                'message' => 'semi-finals already played!'
+            ]);
+        }
+
+        $resultBag = [];
+
+        foreach($bestTeamsByBranches as $key => $branchTeams){
+
+
+            $home = $branchTeams[0]->getHome();
+            $guest = $branchTeams[1]->getHome();
+
+            $this->playMatch($em, DivisionLevels::SEMI_FINAL, $home, $guest);
+            //
+//            $matchWon = (bool)random_int(0, 1);
+//
+//            $thisResult = new Result();
+//            $thisResult->setHome($matchWon ? $home : $guest)
+//                ->setGuests($matchWon ? $guest : $home)
+//                ->setWin(true)
+//                ->setLevel(DivisionLevels::SEMI_FINAL['level'])
+//                ->setPoints(DivisionLevels::SEMI_FINAL['points'])
+//            ;
+//
+//            $em->persist($thisResult);
+//            $resultBag[] = $thisResult;
+        }
+
+        $em->flush();
+
+        return $this->json([
+            'status' => 'success',
+            'message' => 'semi-final games finished',
+//            'ŗesult_bag' => $resultBag,
+        ]);
+    }
+
+    /**
+     * @Route("/final-games", name="final_games")
+     */
+    public function playFinalsAction(Request $request)
+    {
+        $em = $this->get('doctrine.orm.default_entity_manager');
+
+        $resultRepo = $em->getRepository(Result::class);
+        $branchRepo = $em->getRepository(Branch::class);
+
+        $semiFinalGames = $resultRepo->semiFinalGames(DivisionLevels::SEMI_FINAL['level']);
+
+        $winners = [];
+        $loosers = [];
+
+        foreach ($semiFinalGames as $game){
+            $winners[] = $game->getHome();
+            $loosers[] = $game->getGuests();
+        }
+
+        //play for third place
+        $this->playMatch($em, DivisionLevels::FINAL_FINAL_SECOND, $loosers[0], $loosers[1]);
+
+        //play for first place
+        $this->playMatch($em, DivisionLevels::FINAL_FINAL_FIRST, $winners[0], $winners[1]);
+
+
+        return $this->json([
+            'status' => 'success',
+            'message' => 'final games finished',
+        ]);
+    }
+
+    /**
+     * @Route("/final-results", name="final_results")
+     */
+    public function finalResultsAction(Request $request)
+    {
+        $em = $this->get('doctrine.orm.default_entity_manager');
+
+        $resultRepo = $em->getRepository(Result::class);
+        $finalResults = $resultRepo->getFinalResults();
+
+        dump($finalResults);die;
+
+        return $this->json([
+            'status' => 'success',
+            'message' => 'results fetched'
+        ]);
+    }
+
+    private function playMatch(EntityManager $em, $level, Team $home, Team $guest){
+
+        $matchWon = (bool)random_int(0, 1);
+
+        $thisResult = new Result();
+        $thisResult->setHome($matchWon ? $home : $guest)
+            ->setGuests($matchWon ? $guest : $home)
+            ->setWin(true)
+            ->setLevel($level['level'])
+            ->setPoints($level['points'])
+        ;
+
+        $otherResult = new Result();
+        $otherResult->setHome($matchWon ? $guest : $home)
+            ->setGuests($matchWon ? $home : $guest)
+            ->setWin(false)
+            ->setLevel($level['level'])
+            ->setPoints($level['points'] * 0.7)
+        ;
+
+        $em->persist($thisResult);
+        $em->persist($otherResult);
+
+        $em->flush();
     }
 
     /**

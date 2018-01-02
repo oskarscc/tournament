@@ -1,6 +1,8 @@
 <?php
 
 namespace AppBundle\Repository;
+use AppBundle\Entity\Branch;
+use AppBundle\Helpers\DivisionLevels;
 
 /**
  * ResultRepository
@@ -25,6 +27,60 @@ class ResultRepository extends \Doctrine\ORM\EntityRepository
             ->groupBy('team.home')
             ->orderBy('totalPoints', 'DESC')
             ->setMaxResults($maxResult)
+            ->getQuery()
+        ;
+
+        $result = $query->getResult();
+
+        return $result;
+    }
+
+    public function twoBestByBranch(Branch $branch, $level)
+    {
+        $qb = $this->createQueryBuilder('result');
+
+        $query = $qb
+            ->select('result')
+            ->join('result.home', 'homeTeam')
+            ->where('homeTeam.branch = :branch')
+            ->setParameter('branch', $branch)
+            ->andWhere('result.level = :level')
+            ->setParameter('level', $level)
+            ->orderBy('result.points', 'DESC')
+            ->setMaxResults(2)
+            ->getQuery()
+        ;
+
+        $result = $query->getResult();
+
+        return $result;
+    }
+
+    public function semiFinalGames($level)
+    {
+        $qb = $this->createQueryBuilder('result');
+
+        $query = $qb
+            ->select('result')
+            ->andWhere('result.level = :level')
+            ->setParameter('level', $level)
+            ->getQuery()
+        ;
+
+        $result = $query->getResult();
+
+        return $result;
+    }
+
+    public function getFinalResults()
+    {
+        $qb = $this->createQueryBuilder('result');
+
+        $query = $qb
+            ->select('homeTeam.name as teamName', 'SUM(result.points) as totalsum')
+            ->join('result.home', 'homeTeam')
+            ->orderBy('totalsum', 'DESC')
+            ->groupBy('homeTeam')
             ->getQuery()
         ;
 
