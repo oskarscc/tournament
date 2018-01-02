@@ -2,12 +2,14 @@
 
 namespace AppBundle\Controller;
 
+use AppBundle\Entity\Branch;
 use AppBundle\Entity\Result;
 use AppBundle\Entity\Team;
-use AppBundle\Helpers\DIvisionLevels;
+use AppBundle\Helpers\DivisionLevels;
 use AppBundle\Repository\TeamRepository;
 use Symfony\Bundle\FrameworkBundle\Controller\Controller;
 use Sensio\Bundle\FrameworkExtraBundle\Configuration\Route;
+use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Serializer\Encoder\JsonEncoder;
@@ -39,6 +41,7 @@ class ApiController extends Controller
         $teamRepo = $em->getRepository(Team::class);
 
         do {
+
             $teamData = $this->getTeamData($teamRepo, $divisionName);
 
             if ($teamData['teamCount'] >= self::TEAM_COUNT_PER_DEVISION) {
@@ -111,8 +114,8 @@ class ApiController extends Controller
                     $thisResult->setHome($home)
                         ->setGuests($guest)
                         ->setWin($matchWon)
-                        ->setLevel($matchWon ? DIvisionLevels::DIVISION : 0)
-                        ->setPoints($matchWon ? DIvisionLevels::DIVISION_POINTS : 0)
+                        ->setLevel(DivisionLevels::DIVISION['level'])
+                        ->setPoints($matchWon ? DivisionLevels::DIVISION['points'] : 0)
                         ->setDivisionName($divisionName)
                     ;
 
@@ -123,8 +126,12 @@ class ApiController extends Controller
 
         $em->flush();
 
-        return new Response(sprintf('teams of %s division finished games!', $divisionName));
-
+        return $this->json(
+            [
+            'status' => 'Success',
+            'message' => sprintf('teams of %s division finished games!', $divisionName),
+            ]
+        );
     }
 
     /**
@@ -137,21 +144,117 @@ class ApiController extends Controller
 
         $teamRepo = $em->getRepository(Team::class);
         $resultRepo = $em->getRepository(Result::class);
+        $branchRepo = $em->getRepository(Branch::class);
 
         /** @var array $validDivisions */
         $validDivisions = $teamRepo->getDivisions();
+        $divisionSplit = [];
 
-        foreach ($validDivisions as $division){
+        foreach ($validDivisions as $key => $division){
 
-            $best4Teams = $resultRepo->getBest4TeamsbyDivisionAndLevel($division, DIvisionLevels::DIVISION, $MAX_RESULT);
+            $best4Teams = $resultRepo->getBest4TeamsbyDivisionAndLevel($division, DivisionLevels::DIVISION['level'], $MAX_RESULT);
 
-            dump($best4Teams);
+            // any other team than first one returns best teams in reverse order
+            $divisionSplit[$division] = $key == 0 ? $best4Teams: array_reverse($best4Teams);
         }
 
-        die;
+        //check if qfinals are not found in result table already
 
-        return new Response(sprintf('Q-final games finished!'));
+        $qFinalEntries = $resultRepo->findBy(['level' => DivisionLevels::QFINAL['level']]);
 
+        if(count($qFinalEntries) != 0){
+
+            return $this->json([
+                'status' => 'fail',
+                'message' => 'q-finals already played!'
+            ]);
+        }
+
+        $resultBag = [];
+
+        for($i = 0; $i < $MAX_RESULT; $i++){
+
+            $branchNo = ($i < $MAX_RESULT / 2) ? 1 : 2;
+            $thisBranch = $branchRepo->find($branchNo);
+
+            $home = $teamRepo->findOneBy(['id' => $divisionSplit[$validDivisions[0]][$i]['id']]);
+            $guest = $teamRepo->findOneBy(['id' => $divisionSplit[$validDivisions[1]][$i]['id']]);
+
+            $matchWon = (bool)random_int(0, 1);
+
+            $thisResult = new Result();
+            $thisResult->setHome($home)
+                ->setGuests($guest)
+                ->setWin($matchWon)
+                ->setLevel(DivisionLevels::QFINAL['level'])
+                ->setPoints($matchWon ? DivisionLevels::QFINAL['points'] : 0)
+            ;
+
+            $em->persist($thisResult);
+
+            $resultBag[] = $thisResult;
+        }
+
+        $em->flush();
+
+        return $this->json([
+            'status' => 'Qfinal games finished',
+            'message' => 'Db cleared',
+            'ŗesult_bag' => $resultBag,
+        ]);
+
+    }
+
+    /**
+     * @Route("/clean-db", name="clean_db")
+     */
+    public function cleanDbAction(Request $request)
+    {
+        $em = $this->get('doctrine.orm.default_entity_manager');
+        $teamRepo = $em->getRepository('AppBundle:Team');
+
+        $allTeams = $teamRepo->findAll();
+
+        foreach ($allTeams as $team) {
+
+            $em->remove($team);
+        }
+
+        $em->flush();
+
+        return $this->json([
+            'status' => 'Success',
+            'message' => 'Db cleared'
+        ]);
+    }
+
+    /**
+     * @Route("/setup-branches", name="setup_branches")
+     */
+    public function setUpBranches(Request $request)
+    {
+        $em = $this->get('doctrine.orm.default_entity_manager');
+        $branchRepo = $em->getRepository('AppBundle:Branch');
+
+        $branches = ['A', 'B'];
+
+        foreach ($branches as $branch) {
+
+            $thisBranch = $branchRepo->findBy(['name' => $branch]);
+            if($thisBranch == null) {
+
+                $newBranch = new Branch();
+                $newBranch->setName($branch);
+                $em->persist($newBranch);
+            }
+        }
+
+        $em->flush();
+
+        return $this->json([
+            'status' => 'Success',
+            'message' => 'Branches created'
+        ]);
     }
 
     /**
@@ -161,7 +264,6 @@ class ApiController extends Controller
      */
     private function getTeamData(TeamRepository $teamRepo, $divisionName)
     {
-
         $thisDivisionTeams = $teamRepo->findBy(['division' => $divisionName]);
         $thisDivisionTeamCount = count($thisDivisionTeams);
 

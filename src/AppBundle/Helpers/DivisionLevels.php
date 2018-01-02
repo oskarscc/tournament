@@ -9,12 +9,12 @@
 namespace AppBundle\Helpers;
 
 
-class DIvisionLevels
+class DivisionLevels
 {
-    CONST DIVISION = 1;
-    CONST QFINAL = 2;
-    CONST SEMI_FINAL = 3;
-    CONST FINAL_FINAL = 4;
+    CONST DIVISION = ['level' => 1, 'points' => 1];
+    CONST QFINAL = ['level' => 2, 'points' => 20];
+    CONST SEMI_FINAL = ['level' => 3, 'points' => 30];
+    CONST FINAL_FINAL = ['level' => 4, 'points' => 40];
 
     CONST DIVISION_POINTS = 1;
     CONST QFINAL_POINTS = 20;

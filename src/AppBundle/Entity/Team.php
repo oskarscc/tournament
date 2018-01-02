@@ -35,6 +35,11 @@ class Team
      */
     private $division;
 
+    /**
+     * @ORM\ManyToOne(targetEntity="AppBundle\Entity\Branch")
+     * @ORM\JoinColumn(name="branch", referencedColumnName="id", nullable=true)
+     */
+    private $branch;
 
     /**
      * Get id
@@ -53,7 +58,7 @@ class Team
      *
      * @return Team
      */
-    public function setName($name)
+    public function setName($name): Team
     {
         $this->name = $name;
 
@@ -77,7 +82,7 @@ class Team
      *
      * @return Team
      */
-    public function setDivision($division)
+    public function setDivision($division): Team
     {
         $this->division = $division;
 
@@ -92,6 +97,24 @@ class Team
     public function getDivision()
     {
         return $this->division;
+    }
+
+    /**
+     * @return Branch | null
+     */
+    public function getBranch()
+    {
+        return $this->branch;
+    }
+
+    /**
+     * @param Branch $branch
+     */
+    public function setBranch(Branch $branch): Team
+    {
+        $this->branch = $branch;
+
+        return $this;
     }
 }
 
