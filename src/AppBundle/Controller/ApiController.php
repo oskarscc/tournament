@@ -316,11 +316,10 @@ class ApiController extends Controller
         $resultRepo = $em->getRepository(Result::class);
         $finalResults = $resultRepo->getFinalResults();
 
-        dump($finalResults);die;
-
         return $this->json([
             'status' => 'success',
-            'message' => 'results fetched'
+            'message' => 'results fetched',
+            'result' => $finalResults,
         ]);
     }
 
