@@ -23,7 +23,7 @@ class Result
 
     /**
      * @ORM\ManyToOne(targetEntity="AppBundle\Entity\Team")
-     * @ORM\JoinColumn(name="home_team", referencedColumnName="id")
+     * @ORM\JoinColumn(name="home_team", referencedColumnName="id", onDelete="cascade")
      */
     private $home;
 
@@ -60,7 +60,6 @@ class Result
      * @ORM\Column(name="points", type="integer")
      */
     private $points;
-
 
     /**
      * Get id
