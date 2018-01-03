@@ -6,6 +6,7 @@ use AppBundle\Entity\Branch;
 use AppBundle\Entity\Result;
 use AppBundle\Entity\Team;
 use AppBundle\Helpers\DivisionLevels;
+use AppBundle\Repository\ResultRepository;
 use AppBundle\Repository\TeamRepository;
 use Doctrine\ORM\EntityManager;
 use Symfony\Bundle\FrameworkBundle\Controller\Controller;
@@ -69,45 +70,49 @@ class ApiController extends Controller
 
         } while ($teamData['teamCount'] <= self::TEAM_COUNT_PER_DEVISION);
 
-        $encoders = array(new XmlEncoder(), new JsonEncoder());
-        $normalizers = array(new ObjectNormalizer());
-
-        $serializer = new Serializer($normalizers, $encoders);
-        $jsonContent = $serializer->serialize($teamData['teams'], 'json');
+        $jsonContent = $this->serializeJson($teamData['teams']);
 
         return new Response($jsonContent);
     }
 
     /**
-     * @Route("/division-games/{divisionName}", name="division_games")
+     * @Route("/division-games", name="division_games")
      */
-    public function playDivisionAction(Request $request, $divisionName)
+    public function playDivisionAction(Request $request)
     {
+        $divisionName = $request->query->get('divisionName');
+
         $em = $this->get('doctrine.orm.default_entity_manager');
 
         $teamRepo = $em->getRepository(Team::class);
+        /** @var ResultRepository $resultRepo */
         $resultRepo = $em->getRepository(Result::class);
 
         $divisionTeams = $teamRepo->findBy(['division' => $divisionName]);
         $hasPlayed = $resultRepo->findBy(['divisionName' => $divisionName]);
 
-        if(!empty($hasPlayed)){
-            return new Response("This division has already played");
+        if (!empty($hasPlayed)) {
+
+            $resultBucket = $resultRepo->findBy(['divisionName' => $divisionName, 'level' => DivisionLevels::DIVISION['level']]);
+            $jsonContent = $this->serializeJson($resultBucket);
+
+            return new Response($jsonContent);
         }
 
-        if(empty($divisionTeams)){
+        if (empty($divisionTeams)) {
             return new Response("No teams for this division");
         }
 
         // Each team plays with each for current division
+        $resultBucket = [];
 
-        foreach ($divisionTeams as $home){
-            foreach ($divisionTeams as $guest){
+        foreach ($divisionTeams as $home) {
+            foreach ($divisionTeams as $guest) {
 
                 /**@var Team $home */
                 /**@var Team $guest */
 
-                if($home->getId() != $guest->getId()){
+                if ($home->getId() != $guest->getId()) {
 
                     $matchWon = (bool)random_int(0, 1);
 
@@ -117,26 +122,46 @@ class ApiController extends Controller
                         ->setWin($matchWon)
                         ->setLevel(DivisionLevels::DIVISION['level'])
                         ->setPoints($matchWon ? DivisionLevels::DIVISION['points'] : 0)
-                        ->setDivisionName($divisionName)
-                    ;
+                        ->setDivisionName($divisionName);
 
                     $em->persist($thisResult);
+                    $resultBucket[] = $thisResult;
                 }
             }
         }
 
         $em->flush();
 
-        return $this->json(
-            [
-            'status' => 'Success',
-            'message' => sprintf('teams of %s division finished games!', $divisionName),
-            ]
-        );
+        $resultBucket = $resultRepo->findBy(['divisionName' => $divisionName, 'level' => DivisionLevels::DIVISION['level']]);
+        $jsonContent = $this->serializeJson($resultBucket);
+
+        return new Response($jsonContent);
     }
 
     /**
-     * @Route("/qfinal-games", name="qfinal_games")
+     * @Route("/playoff-games", name="playoff_games")
+     */
+    public function playOffForwarderAction(Request $request)
+    {
+        $divisionName = $request->query->get('playoffLevel');
+
+        switch ($divisionName) {
+            case ('qfinal'):
+                $response = $this->forward('AppBundle:Api:playQFinal',['request' => $request] );
+                break;
+            case ('semifinal'):
+                $response = $this->forward('AppBundle:Api:playSemiFinal',['request' => $request] );
+                break;
+            case ('final'):
+                $response = $this->forward('AppBundle:Api:playFinals',['request' => $request] );
+                break;
+        }
+
+        return $response;
+    }
+
+    /**
+     * @Route("/playoff-games-qfinal", name="playoff-games-qfinal")
      */
     public function playQFinalAction(Request $request)
     {
@@ -151,67 +176,51 @@ class ApiController extends Controller
         $validDivisions = $teamRepo->getDivisions();
         $divisionSplit = [];
 
-        foreach ($validDivisions as $key => $division){
+        foreach ($validDivisions as $key => $division) {
 
             $best4Teams = $resultRepo->getBest4TeamsbyDivisionAndLevel($division, DivisionLevels::DIVISION['level'], $MAX_RESULT);
 
             // any other team than first one returns best teams in reverse order
-            $divisionSplit[$division] = $key == 0 ? $best4Teams: array_reverse($best4Teams);
+            $divisionSplit[$division] = $key == 0 ? $best4Teams : array_reverse($best4Teams);
         }
 
         //check if qfinals are found in result table already
         $qFinalEntries = $resultRepo->findBy(['level' => DivisionLevels::QFINAL['level']]);
 
-        if(count($qFinalEntries) != 0){
+        if (count($qFinalEntries) != 0) {
 
-            return $this->json([
-                'status' => 'fail',
-                'message' => 'q-finals already played!'
-            ]);
+            $resultBucket = $resultRepo->findBy(['level' => DivisionLevels::QFINAL['level']]);
+            $jsonContent = $this->serializeJson($resultBucket);
+
+            return new Response($jsonContent);
         }
 
-        $resultBag = [];
+        $allBranches = $branchRepo->findAll();
 
-        for($i = 0; $i < $MAX_RESULT; $i++){
+        for ($i = 0; $i < $MAX_RESULT; $i++) {
 
-            $branchNo = ($i < $MAX_RESULT / 2) ? 1 : 2;
-            $thisBranch = $branchRepo->find($branchNo);
+            $thisBranch = ($i < $MAX_RESULT / 2) ? $allBranches[0] : end($allBranches);
 
             $home = $teamRepo->findOneBy(['id' => $divisionSplit[$validDivisions[0]][$i]['id']]);
             $guest = $teamRepo->findOneBy(['id' => $divisionSplit[$validDivisions[1]][$i]['id']]);
 
             $this->playMatch($em, DivisionLevels::QFINAL, $home, $guest);
 
-//            $matchWon = (bool)random_int(0, 1);
-//
-//            $thisResult = new Result();
-//            $thisResult->setHome($matchWon ? $home : $guest)
-//                ->setGuests($matchWon ? $guest : $home)
-//                ->setWin(true)
-//                ->setLevel(DivisionLevels::QFINAL['level'])
-//                ->setPoints(DivisionLevels::QFINAL['points'])
-//            ;
-
             $home->setBranch($thisBranch);
             $guest->setBranch($thisBranch);
-
-//            $em->persist($thisResult);
-
-//            $resultBag[] = $thisResult;
         }
 
         $em->flush();
 
-        return $this->json([
-            'status' => 'success',
-            'message' => 'qfinal games finished',
-//            'ŗesult_bag' => $resultBag,
-        ]);
+        $resultBucket = $resultRepo->findBy(['level' => DivisionLevels::QFINAL['level']]);
+        $jsonContent = $this->serializeJson($resultBucket);
+
+        return new Response($jsonContent);
 
     }
 
     /**
-     * @Route("/semi-final-games", name="semi_final_games")
+     * @Route("/playoff-games-semifinal", name="playoff_games_semifinal")
      */
     public function playSemiFinalAction(Request $request)
     {
@@ -233,63 +242,59 @@ class ApiController extends Controller
         //check if semi-finals are found in result table already
         $semiFinalEntries = $resultRepo->findBy(['level' => DivisionLevels::SEMI_FINAL['level']]);
 
-        if(count($semiFinalEntries) != 0){
+        if (count($semiFinalEntries) != 0) {
 
-            return $this->json([
-                'status' => 'fail',
-                'message' => 'semi-finals already played!'
-            ]);
+            $resultBucket = $resultRepo->findBy(['level' => DivisionLevels::SEMI_FINAL['level']]);
+            $jsonContent = $this->serializeJson($resultBucket);
+
+            return new Response($jsonContent);
         }
 
-        $resultBag = [];
-
-        foreach($bestTeamsByBranches as $key => $branchTeams){
+        foreach ($bestTeamsByBranches as $key => $branchTeams) {
 
 
             $home = $branchTeams[0]->getHome();
             $guest = $branchTeams[1]->getHome();
 
             $this->playMatch($em, DivisionLevels::SEMI_FINAL, $home, $guest);
-            //
-//            $matchWon = (bool)random_int(0, 1);
-//
-//            $thisResult = new Result();
-//            $thisResult->setHome($matchWon ? $home : $guest)
-//                ->setGuests($matchWon ? $guest : $home)
-//                ->setWin(true)
-//                ->setLevel(DivisionLevels::SEMI_FINAL['level'])
-//                ->setPoints(DivisionLevels::SEMI_FINAL['points'])
-//            ;
-//
-//            $em->persist($thisResult);
-//            $resultBag[] = $thisResult;
         }
 
         $em->flush();
 
-        return $this->json([
-            'status' => 'success',
-            'message' => 'semi-final games finished',
-//            'ŗesult_bag' => $resultBag,
-        ]);
+        $resultBucket = $resultRepo->findBy(['level' => DivisionLevels::SEMI_FINAL['level']]);
+        $jsonContent = $this->serializeJson($resultBucket);
+
+        return new Response($jsonContent);
     }
 
     /**
-     * @Route("/final-games", name="final_games")
+     * @Route("/playoff-games-final", name="playoff_games_final")
      */
     public function playFinalsAction(Request $request)
     {
-        $em = $this->get('doctrine.orm.default_entity_manager');
+        $resultBucket = [];
 
+        $em = $this->get('doctrine.orm.default_entity_manager');
         $resultRepo = $em->getRepository(Result::class);
-        $branchRepo = $em->getRepository(Branch::class);
+
+        $semiFinalGameCount = $resultRepo->findBy(['level' => DivisionLevels::FINAL_FINAL_FIRST['level']]);
+
+        if (count($semiFinalGameCount) != 0) {
+
+            $resultBucket1 = $resultRepo->findBy(['level' => DivisionLevels::FINAL_FINAL_FIRST['level']]);
+            $resultBucket2 = $resultRepo->findBy(['level' => DivisionLevels::FINAL_FINAL_SECOND['level']]);
+
+            $jsonContent = $this->serializeJson(array_merge($resultBucket1, $resultBucket2));
+
+            return new Response($jsonContent);
+        }
 
         $semiFinalGames = $resultRepo->semiFinalGames(DivisionLevels::SEMI_FINAL['level']);
 
         $winners = [];
         $loosers = [];
 
-        foreach ($semiFinalGames as $game){
+        foreach ($semiFinalGames as $game) {
             $winners[] = $game->getHome();
             $loosers[] = $game->getGuests();
         }
@@ -300,11 +305,12 @@ class ApiController extends Controller
         //play for first place
         $this->playMatch($em, DivisionLevels::FINAL_FINAL_FIRST, $winners[0], $winners[1]);
 
+        $resultBucket1 = $resultRepo->findBy(['level' => DivisionLevels::FINAL_FINAL_FIRST['level']]);
+        $resultBucket2 = $resultRepo->findBy(['level' => DivisionLevels::FINAL_FINAL_SECOND['level']]);
 
-        return $this->json([
-            'status' => 'success',
-            'message' => 'final games finished',
-        ]);
+        $jsonContent = $this->serializeJson(array_merge($resultBucket1, $resultBucket2));
+
+        return new Response($jsonContent);
     }
 
     /**
@@ -317,15 +323,13 @@ class ApiController extends Controller
         $resultRepo = $em->getRepository(Result::class);
         $finalResults = $resultRepo->getFinalResults();
 
-        return $this->json([
-            'status' => 'success',
-            'message' => 'results fetched',
-            'result' => $finalResults,
-        ]);
+        $jsonContent = $this->serializeJson($finalResults);
+
+        return new Response($jsonContent);
     }
 
-    private function playMatch(EntityManager $em, $level, Team $home, Team $guest){
-
+    private function playMatch(EntityManager $em, $level, Team $home, Team $guest)
+    {
         $matchWon = (bool)random_int(0, 1);
 
         $thisResult = new Result();
@@ -333,16 +337,14 @@ class ApiController extends Controller
             ->setGuests($matchWon ? $guest : $home)
             ->setWin(true)
             ->setLevel($level['level'])
-            ->setPoints($level['points'])
-        ;
+            ->setPoints($level['points']);
 
         $otherResult = new Result();
         $otherResult->setHome($matchWon ? $guest : $home)
             ->setGuests($matchWon ? $home : $guest)
             ->setWin(false)
             ->setLevel($level['level'])
-            ->setPoints($level['points'] * 0.7)
-        ;
+            ->setPoints($level['points'] * 0.7);
 
         $em->persist($thisResult);
         $em->persist($otherResult);
@@ -356,13 +358,36 @@ class ApiController extends Controller
     public function cleanDbAction(Request $request)
     {
         $em = $this->get('doctrine.orm.default_entity_manager');
-        $teamRepo = $em->getRepository('AppBundle:Team');
+        $teamRepo = $em->getRepository(Team::class);
+        $resultRepo = $em->getRepository(Result::class);
+        $branchRepo = $em->getRepository(Branch::class);
 
         $allTeams = $teamRepo->findAll();
+        $allResults = $resultRepo->findAll();
+        $allBranches = $branchRepo->findAll();
+
+        foreach ($allBranches as $branch) {
+
+            $em->remove($branch);
+        }
+
+        $em->flush();
+
+        foreach ($allResults as $result) {
+
+            $em->remove($result);
+        }
 
         foreach ($allTeams as $team) {
 
             $em->remove($team);
+        }
+
+        $em->flush();
+
+        foreach ($allResults as $result) {
+
+            $em->remove($result);
         }
 
         $em->flush();
@@ -386,7 +411,7 @@ class ApiController extends Controller
         foreach ($branches as $branch) {
 
             $thisBranch = $branchRepo->findBy(['name' => $branch]);
-            if($thisBranch == null) {
+            if ($thisBranch == null) {
 
                 $newBranch = new Branch();
                 $newBranch->setName($branch);
@@ -416,5 +441,20 @@ class ApiController extends Controller
             'teamCount' => $thisDivisionTeamCount,
             'teams' => $thisDivisionTeams
         ];
+    }
+
+    /**
+     * @param $data
+     * @return string|\Symfony\Component\Serializer\Encoder\scalar
+     */
+    public function serializeJson($data)
+    {
+        $encoders = array(new XmlEncoder(), new JsonEncoder());
+        $normalizers = array(new ObjectNormalizer());
+
+        $serializer = new Serializer($normalizers, $encoders);
+        $jsonContent = $serializer->serialize($data, 'json');
+
+        return $jsonContent;
     }
 }

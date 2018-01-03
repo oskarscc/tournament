@@ -63,7 +63,9 @@ class ResultRepository extends \Doctrine\ORM\EntityRepository
         $query = $qb
             ->select('result')
             ->andWhere('result.level = :level')
+            ->andWhere('result.win = :win')
             ->setParameter('level', $level)
+            ->setParameter('win', true)
             ->getQuery()
         ;
 

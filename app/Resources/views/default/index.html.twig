@@ -4,14 +4,18 @@
 
     <div class="container">
 
+        <button class="btn btn-danger initial-setup" id="initial_setup">InitialSetup</button>
+        <button class="btn btn-danger clear-db" id="clear_db">Clear Db</button>
+
+        {# begin generate devisions#}
         <div class="row">
             <div class="col-md-6">
                 <h2>Division First</h2>
-                <table class="table table-bordered">
+                <table class="table table-bordered division-table-first" id="division-table-first">
                     <thead>
                     <tr>
                         <th>TeamName</th>
-                        <button class="btn btn-action" id="first" name="first">Generate First</button>
+                        <button class="btn btn-action generate-devisions" id="first" name="first">Generate First</button>
                     </tr>
                     </thead>
                     <tbody>
@@ -21,11 +25,11 @@
 
             <div class="col-md-6">
                 <h2>Division Second</h2>
-                <table class="table table-bordered">
+                <table class="table table-bordered division-table-second">
                     <thead>
                     <tr>
                         <th>TeamName</th>
-                        <button class="btn btn-action" id="second" name="second">Generate Second</button>
+                        <button class="btn btn-action generate-devisions" id="second" name="second">Generate Second</button>
                     </tr>
                     </thead>
                     <tbody>
@@ -33,31 +37,286 @@
                 </table>
             </div>
         </div>
-    </div>
+        {# end generate devisions#}
+
+        {# begin devision Games#}
+        <div class="row">
+            <div class="col-md-6">
+                <h2>First Division Games</h2>
+                <table class="table table-bordered division-games-first" id="division-games-first">
+                    <thead>
+                    <tr>
+                        <th>Home</th>
+                        <th>Guest</th>
+                        <th>Result</th>
+                        <button class="btn btn-action devision-games" id="first" name="first">Play First Division Games</button>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="col-md-6">
+                <h2>Second Division Games</h2>
+                <table class="table table-bordered division-games-second">
+                    <thead>
+                    <tr>
+                        <th>Home</th>
+                        <th>Guest</th>
+                        <th>Result</th>
+                        <button class="btn btn-action devision-games" id="second" name="second">Play Second Division Games</button>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {# end devision games#}
+
+        {# begin playoff Games#}
+        <div class="row">
+            <div class="col-md-4">
+                <h2>Qfinal games</h2>
+                <table class="table table-bordered playoff-games-qfinal" id="playoff-games-qfinal">
+                    <thead>
+                    <tr>
+                        <th>Home</th>
+                        <th>Guest</th>
+                        <th>Result</th>
+                        <th>Branch</th>
+                        <button class="btn btn-action playoff-games" id="qfinal" name="qfinal">Playoff Qfinal</button>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="col-md-4">
+                <h2>Semifinal games</h2>
+                <table class="table table-bordered playoff-games-semifinal" id="playoff-games-semifinal">
+                    <thead>
+                    <tr>
+                        <th>Home</th>
+                        <th>Guest</th>
+                        <th>Result</th>
+                        <th>Branch</th>
+                        <button class="btn btn-action playoff-games" id="semifinal" name="semifinal">Playoff Semifinal</button>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="col-md-4">
+                <h2>Qfinal games</h2>
+                <table class="table table-bordered playoff-games-final" id="playoff-games-final">
+                    <thead>
+                    <tr>
+                        <th>Home</th>
+                        <th>Guest</th>
+                        <th>Result</th>
+                        <th>Branch</th>
+                        <button class="btn btn-action playoff-games" id="final" name="final">Playoff Final</button>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {# end playoff games#}
+
+        {# begin result table#}
+        <div class="row">
+            <div class="col-md-6">
+                <h2>Result table</h2>
+                <table class="table table-bordered result-table" id="result-table">
+                    <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Points</th>
+                        <button class="btn btn-action result-table-button" id="resultTable" name="qfinal">ShowResults</button>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {# end result table#}
 
 {% endblock %}
 
 {% block javascripts %}
     <script>
         $(document).ready(function() {
-            $("button").click(function(e) {
+
+            $(".generate-devisions").click(function(e) {
 
                 e.preventDefault();
+                this.thisTableClass = '.division-table-'+this.id;
 
+                var self = this;
                 $.ajax({
                     type: "GET",
                     url: "{{ path('generate_division') }}",
                     data: {
                         divisionName: this.id,
                     },
-                    success: function(result) {
-                        alert('ok');
+                    success: function(responseData) {
+
+                        var json = JSON.parse(responseData);
+                        $(self.thisTableClass + '> tbody').empty();
+
+                        for (var key in json) {
+                            var newRow = '<tr><td>'+ json[key].name +'</td></tr>';
+                            $(self.thisTableClass + ' > tbody').append(newRow);
+                        }
                     },
                     error: function(result) {
                         alert('error');
                     }
                 });
             });
+
+            $(".devision-games").click(function(e) {
+
+                e.preventDefault();
+                this.thisTableClass = '.division-games-'+this.id;
+
+                var self = this;
+                $.ajax({
+                    type: "GET",
+                    url: "{{ path('division_games') }}",
+                    data: {
+                        divisionName: this.id,
+                    },
+                    success: function(responseData) {
+
+                        // $('#' + self.id).attr('disabled', true);
+                        // console.log(self.thisTableClass);
+                        var json = JSON.parse(responseData);
+                        $(self.thisTableClass + '> tbody').empty();
+
+                        for (var key in json) {
+
+                            var resultHome = (json[key].win == true ? 1 : 0);
+                            var resultGuest = (json[key].win == true ? 0 : 1);
+
+                            var newRow = '<tr><td>'+ json[key].home.name +'</td><td>'+ json[key].guests.name +'</td><td>'+ resultHome +':' + resultGuest +'</td></tr>';
+                            $(self.thisTableClass + ' > tbody').append(newRow);
+                        }
+                    },
+                    error: function(result) {
+                        alert('error');
+                    }
+                });
+            });
+
+            $(".playoff-games").click(function(e) {
+
+                e.preventDefault();
+                this.thisTableClass = '.playoff-games-'+this.id;
+
+                var self = this;
+                $.ajax({
+                    type: "GET",
+                    url: "{{ path('playoff_games') }}",
+                    data: {
+                        playoffLevel: this.id,
+                    },
+                    success: function(responseData) {
+
+                        // $('#' + self.id).attr('disabled', true);
+                        // console.log(self.thisTableClass);
+                        var json = JSON.parse(responseData);
+                        $(self.thisTableClass + '> tbody').empty();
+
+                        console.log(self.thisTableClass);
+
+                        for (var key in json) {
+
+                            var resultHome = (json[key].win == true ? 1 : 0);
+                            var resultGuest = (json[key].win == true ? 0 : 1);
+
+                            var newRow = '<tr><td>'+ json[key].home.name +'</td><td>'+ json[key].guests.name +'</td><td>'+ resultHome +':' + resultGuest +'</td><td>'+ json[key].home.branch.name +'</td</tr>';
+                            if(json[key].win == true) {
+                                $(self.thisTableClass + ' > tbody').append(newRow);
+                            }
+                        }
+                    },
+                    error: function(result) {
+                        alert('error');
+                    }
+                });
+            });
+
+            $(".result-table-button").click(function(e) {
+
+                e.preventDefault();
+                this.thisTableClass = '.result-table';
+
+                var self = this;
+                $.ajax({
+                    type: "GET",
+                    url: "{{ path('final_results') }}",
+                    data: {
+                    },
+                    success: function(responseData) {
+
+                        var json = JSON.parse(responseData);
+                        $(self.thisTableClass + '> tbody').empty();
+
+                        for (var key in json) {
+                            var newRow = '<tr><td>'+ json[key].teamName +'</td><td>'+ json[key].totalsum +'</td></tr>';
+                            $(self.thisTableClass + ' > tbody').append(newRow);
+                        }
+                    },
+                    error: function(result) {
+                        alert('error');
+                    }
+                });
+            });
+
+            $("#initial_setup").click(function(e) {
+
+                e.preventDefault();
+                $.ajax({
+                    type: "GET",
+                    url: "{{ path('setup_branches') }}",
+                    data: {
+                    },
+                    success: function(responseData) {
+                        alert('Setup Complete');
+                    },
+                    error: function(result) {
+                        alert('error');
+                    }
+                });
+            });
+
+            $("#clear_db").click(function(e) {
+
+                e.preventDefault();
+                $.ajax({
+                    type: "GET",
+                    url: "{{ path('clean_db') }}",
+                    data: {
+                    },
+                    success: function(responseData) {
+                        alert('database cleaned');
+                        location.reload();
+                    },
+                    error: function(result) {
+                        alert('error');
+                    }
+                });
+            });
+
         });
     </script>
 {% endblock %}

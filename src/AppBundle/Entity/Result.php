@@ -23,13 +23,13 @@ class Result
 
     /**
      * @ORM\ManyToOne(targetEntity="AppBundle\Entity\Team")
-     * @ORM\JoinColumn(name="home_team", referencedColumnName="id", onDelete="cascade")
+     * @ORM\JoinColumn(name="home_team", referencedColumnName="id", onDelete="SET NULL")
      */
     private $home;
 
     /**
      * @ORM\ManyToOne(targetEntity="AppBundle\Entity\Team")
-     * @ORM\JoinColumn(name="guest_team", referencedColumnName="id")
+     * @ORM\JoinColumn(name="guest_team", referencedColumnName="id", onDelete="SET NULL")
      */
     private $guests;
 
